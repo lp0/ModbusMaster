@@ -629,6 +629,14 @@ uint8_t ModbusMaster::readWriteMultipleRegisters(uint16_t u16ReadAddress,
 }
 
 
+uint8_t  ModbusMaster::writePassword(uint32_t password)
+{
+  _u16TransmitBuffer[0] = password >> 16;
+  _u16TransmitBuffer[1] = password;
+  return ModbusMasterTransaction(ku8MBWritePassword);
+}
+
+
 /* _____PRIVATE FUNCTIONS____________________________________________________ */
 /**
 Modbus transaction engine.
@@ -738,6 +746,21 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
       break;
   }
   
+  switch (u8MBFunction)
+  {
+    case ku8MBWritePassword:
+      u8ModbusADU[u16ModbusADUSize++] = 0xFE;
+      u8ModbusADU[u16ModbusADUSize++] = 0x01;
+      u8ModbusADU[u16ModbusADUSize++] = 0x00;
+      u8ModbusADU[u16ModbusADUSize++] = 0x02;
+      u8ModbusADU[u16ModbusADUSize++] = 0x04;
+      u8ModbusADU[u16ModbusADUSize++] = highByte(_u16TransmitBuffer[0]);
+      u8ModbusADU[u16ModbusADUSize++] = lowByte(_u16TransmitBuffer[0]);
+      u8ModbusADU[u16ModbusADUSize++] = highByte(_u16TransmitBuffer[1]);
+      u8ModbusADU[u16ModbusADUSize++] = lowByte(_u16TransmitBuffer[1]);
+      break;
+  }
+
   // append CRC
   u16CRC = 0xFFFF;
   for (i = 0; i < u16ModbusADUSize; i++)
@@ -858,6 +881,10 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
         case ku8MBMaskWriteRegister:
           u8BytesLeft = 5;
           break;
+
+        case ku8MBWritePassword:
+          u8BytesLeft = 3;
+          break;
       }
     }
     if ((millis() - u32StartTime) > ku16MBResponseTimeout)
@@ -933,6 +960,11 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
           
           _u8ResponseBufferLength = i;
         }
+        break;
+
+      case ku8MBWritePassword:
+        _u16ResponseBuffer[0] = word(u8ModbusADU[2], u8ModbusADU[3]);
+        _u16ResponseBuffer[1] = word(u8ModbusADU[4], u8ModbusADU[5]);
         break;
     }
   }
